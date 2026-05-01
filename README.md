@@ -1,8 +1,8 @@
-# 📌 TaskFlow — Team Task Manager
+#  TaskFlow — Team Task Manager
 
 A full-stack web app for managing team projects and tasks with role-based access control.
 
-## 🚀 Features
+## Features
 
 - **Authentication** — JWT-based signup/login with bcrypt password hashing
 - **Projects** — Create projects, invite team members, manage via color-coded cards
@@ -12,7 +12,7 @@ A full-stack web app for managing team projects and tasks with role-based access
 - **Dashboard** — Stats overview (total, in-progress, overdue, completed) + recent activity table
 - **Team Management** — Add/remove members by email, assign Admin/Member roles
 
-## 🛠 Tech Stack
+##  Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -23,7 +23,7 @@ A full-stack web app for managing team projects and tasks with role-based access
 | Frontend | Vanilla HTML/CSS/JS (SPA) |
 | Deployment | Railway |
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 team-task-manager/
@@ -51,7 +51,7 @@ team-task-manager/
 └── README.md
 ```
 
-## ⚙️ Setup & Run Locally
+##  Setup & Run Locally
 
 ### 1. Clone & Install
 ```bash
@@ -76,7 +76,7 @@ npm start     # Production
 
 App runs at `http://localhost:5000`
 
-## 🌐 Deploy on Railway
+## Deploy on Railway
 
 1. Push code to GitHub
 2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
