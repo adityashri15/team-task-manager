@@ -92,7 +92,7 @@
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
   .btn-danger { background: #3a1a1a; color: var(--danger); border: 1px solid #5a2a2a; }
-  .btn-danger:hover { background: #4a1a1a; }
+  .btn-danger:hover { background: #4a2020; }
   .btn-full { width: 100%; justify-content: center; }
   .btn-sm { padding: 7px 14px; font-size: 13px; }
   .btn-icon { padding: 8px; border-radius: 8px; }
@@ -212,10 +212,12 @@
   .task-card {
     background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
     padding: 14px; margin-bottom: 10px; cursor: pointer; transition: all .2s;
+    position: relative;
   }
   .task-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .task-card:hover .task-quick-delete { opacity: 1; }
   .task-card:last-child { margin-bottom: 0; }
-  .task-title { font-size: 14px; font-weight: 500; margin-bottom: 8px; line-height: 1.4; }
+  .task-title { font-size: 14px; font-weight: 500; margin-bottom: 8px; line-height: 1.4; padding-right: 24px; }
   .task-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
   .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
   .badge-low { background: #1a3a1a; color: var(--success); }
@@ -227,6 +229,19 @@
   .task-due.overdue { color: var(--danger); }
   .task-assignee { display: flex; align-items: center; gap: 6px; }
   .mini-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); font-size: 10px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+  /* Quick-delete X on task card (visible on hover) */
+  .task-quick-delete {
+    position: absolute; top: 10px; right: 10px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #3a1a1a; border: 1px solid #5a2a2a;
+    color: var(--danger); font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity .15s;
+    z-index: 2;
+  }
+  .task-quick-delete:hover { background: #5a2020; }
+
   .add-task-btn {
     width: 100%; padding: 10px; background: none; border: 1px dashed var(--border);
     border-radius: 8px; color: var(--text-muted); font-family: var(--font-body);
@@ -267,6 +282,30 @@
   .member-info { flex: 1; }
   .member-name { font-size: 14px; font-weight: 500; }
   .member-email { font-size: 12px; color: var(--text-muted); }
+
+  /* ─── DELETE PROJECT DANGER ZONE ─── */
+  .danger-zone {
+    margin-top: 40px;
+    border: 1px solid #5a2a2a;
+    border-radius: 14px;
+    padding: 24px;
+    background: #1a0a0a;
+  }
+  .danger-zone-title {
+    font-family: var(--font-head);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--danger);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .danger-zone-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
 
   /* ─── RECENT TASKS TABLE ─── */
   .table { width: 100%; border-collapse: collapse; }
@@ -447,7 +486,7 @@
       </div>
     </div>
 
-    <!-- TASKS (KANBAN) VIEW -->
+    <!-- TASKS VIEW -->
     <div class="view" id="view-tasks">
       <div class="view-header">
         <div>
@@ -489,6 +528,17 @@
         <button class="btn btn-primary" id="add-member-btn" onclick="openAddMemberModal()" style="display:none">+ Add Member</button>
       </div>
       <div class="members-list" id="members-list"></div>
+
+      <!-- DANGER ZONE: Delete Project (admin only) -->
+      <div class="danger-zone" id="delete-project-zone" style="display:none">
+        <div class="danger-zone-title">⚠ Danger Zone</div>
+        <div class="danger-zone-desc">
+          Permanently delete this project and all its tasks. This action <strong>cannot be undone</strong>. All tasks and member associations will be removed immediately.
+        </div>
+        <button class="btn btn-danger" onclick="deleteCurrentProject()">
+          🗑 Delete Project
+        </button>
+      </div>
     </div>
   </main>
 </div>
@@ -521,7 +571,7 @@
   </div>
 </div>
 
-<!-- Create Task Modal -->
+<!-- Create/Edit Task Modal -->
 <div class="modal-overlay" id="modal-create-task">
   <div class="modal">
     <div class="modal-header">
@@ -568,7 +618,10 @@
     </div>
     <div class="error-msg" id="create-task-error"></div>
     <div class="modal-footer">
-      <button class="btn btn-danger btn-sm" id="task-delete-btn" onclick="deleteCurrentTask()" style="display:none;margin-right:auto">Delete</button>
+      <!-- Delete button: visible to ALL members when editing a task -->
+      <button class="btn btn-danger btn-sm" id="task-delete-btn" onclick="deleteCurrentTask()" style="display:none;margin-right:auto">
+        🗑 Delete Task
+      </button>
       <button class="btn btn-secondary" onclick="closeModal('modal-create-task')">Cancel</button>
       <button class="btn btn-primary" onclick="saveTask()" id="task-save-btn">Create Task</button>
     </div>
@@ -605,14 +658,10 @@
 <div class="toast-container" id="toast-container"></div>
 
 <script>
-// ═══════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════
+// ─── CONFIG ───
 const API = window.location.origin + '/api';
 
-// ═══════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════
+// ─── STATE ───
 let state = {
   token: localStorage.getItem('tf_token') || null,
   user: JSON.parse(localStorage.getItem('tf_user') || 'null'),
@@ -623,9 +672,7 @@ let state = {
   selectedColor: '#6366f1',
 };
 
-// ═══════════════════════════════════════════
-// API HELPER
-// ═══════════════════════════════════════════
+// ─── API ───
 async function api(method, path, body) {
   const opts = {
     method,
@@ -639,9 +686,7 @@ async function api(method, path, body) {
   return data;
 }
 
-// ═══════════════════════════════════════════
-// TOAST
-// ═══════════════════════════════════════════
+// ─── TOAST ───
 function toast(msg, type = 'success') {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
@@ -650,9 +695,7 @@ function toast(msg, type = 'success') {
   setTimeout(() => el.remove(), 3500);
 }
 
-// ═══════════════════════════════════════════
-// AUTH
-// ═══════════════════════════════════════════
+// ─── AUTH ───
 function switchAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
   document.getElementById('login-form').style.display = tab==='login' ? '' : 'none';
@@ -701,35 +744,25 @@ function logout() {
   document.getElementById('auth-screen').style.display = '';
 }
 
-// ═══════════════════════════════════════════
-// BOOT
-// ═══════════════════════════════════════════
+// ─── BOOT ───
 async function bootApp() {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
 
-  // Set user info in sidebar
   const u = state.user;
   document.getElementById('sidebar-avatar').textContent = u.name[0].toUpperCase();
   document.getElementById('sidebar-name').textContent = u.name;
   document.getElementById('sidebar-email').textContent = u.email;
 
-  // Greeting
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   document.getElementById('dashboard-greeting').textContent = greet + ' ' + u.name.split(' ')[0] + ' 👋';
 
-  // Init color picker
   initColorPicker();
-
-  // Load projects
   await loadProjects();
   await loadDashboard();
 }
 
-// ═══════════════════════════════════════════
-// VIEWS
-// ═══════════════════════════════════════════
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -738,9 +771,7 @@ function showView(name) {
   if (nav) nav.classList.add('active');
 }
 
-// ═══════════════════════════════════════════
-// DASHBOARD
-// ═══════════════════════════════════════════
+// ─── DASHBOARD ───
 async function loadDashboard() {
   try {
     const data = await api('GET', '/tasks/dashboard/summary');
@@ -775,9 +806,7 @@ function goToTask(taskId, projectId) {
   if (proj) { openProject(proj); }
 }
 
-// ═══════════════════════════════════════════
-// PROJECTS
-// ═══════════════════════════════════════════
+// ─── PROJECTS ───
 async function loadProjects() {
   try {
     const data = await api('GET', '/projects');
@@ -817,19 +846,20 @@ function openProject(project) {
   document.getElementById('tasks-project-name').textContent = project.name;
   document.getElementById('members-project-name').textContent = project.name;
 
-  // Show add member button only for admins
   const me = project.members.find(m => (m.user._id||m.user) === state.user._id);
   const isAdmin = me?.role === 'Admin';
+
   document.getElementById('add-member-btn').style.display = isAdmin ? '' : 'none';
+
+  // Show/hide delete project danger zone (admin only)
+  document.getElementById('delete-project-zone').style.display = isAdmin ? '' : 'none';
 
   loadTasks(project._id);
   renderMembers(project);
   showView('tasks');
 }
 
-// ═══════════════════════════════════════════
-// TASKS / KANBAN
-// ═══════════════════════════════════════════
+// ─── TASKS ───
 async function loadTasks(projectId) {
   try {
     const data = await api('GET', `/tasks?project=${projectId}`);
@@ -875,6 +905,8 @@ function taskCard(t) {
   const assignee = t.assignedTo;
   return `
     <div class="task-card" onclick="openEditTaskModal('${t._id}')">
+      <!-- Quick-delete button: available to ALL members, stops propagation so it doesn't open edit modal -->
+      <div class="task-quick-delete" onclick="event.stopPropagation(); quickDeleteTask('${t._id}')" title="Delete task">✕</div>
       <div class="task-title">${t.title}</div>
       <div class="task-badges">
         <span class="badge badge-${t.priority?.toLowerCase()}">${t.priority}</span>
@@ -886,6 +918,18 @@ function taskCard(t) {
       </div>
     </div>
   `;
+}
+
+// Quick-delete from card (no modal, available to everyone)
+async function quickDeleteTask(taskId) {
+  if (!confirm('Delete this task?')) return;
+  try {
+    await api('DELETE', `/tasks/${taskId}`);
+    state.tasks = state.tasks.filter(t => t._id !== taskId);
+    renderKanban();
+    loadDashboard();
+    toast('Task deleted');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 function updateAssigneeFilter() {
@@ -914,6 +958,7 @@ function openCreateTaskModal(status) {
   document.getElementById('task-status').value = status || 'Todo';
   document.getElementById('task-priority').value = 'Medium';
   document.getElementById('task-due').value = '';
+  // Hide delete button for new tasks
   document.getElementById('task-delete-btn').style.display = 'none';
   document.getElementById('task-save-btn').textContent = 'Create Task';
   document.getElementById('create-task-error').classList.remove('show');
@@ -931,6 +976,7 @@ function openEditTaskModal(taskId) {
   document.getElementById('task-status').value = task.status;
   document.getElementById('task-priority').value = task.priority;
   document.getElementById('task-due').value = task.dueDate ? task.dueDate.slice(0,10) : '';
+  // Show delete button for ALL members when editing
   document.getElementById('task-delete-btn').style.display = '';
   document.getElementById('task-save-btn').textContent = 'Save Changes';
   document.getElementById('create-task-error').classList.remove('show');
@@ -988,8 +1034,9 @@ async function saveTask() {
   }
 }
 
+// Delete task from modal (available to ALL members)
 async function deleteCurrentTask() {
-  if (!state.editingTaskId || !confirm('Delete this task?')) return;
+  if (!state.editingTaskId || !confirm('Delete this task? This cannot be undone.')) return;
   try {
     await api('DELETE', `/tasks/${state.editingTaskId}`);
     state.tasks = state.tasks.filter(t => t._id !== state.editingTaskId);
@@ -1000,9 +1047,7 @@ async function deleteCurrentTask() {
   } catch(e) { toast(e.message,'error'); }
 }
 
-// ═══════════════════════════════════════════
-// PROJECTS CRUD
-// ═══════════════════════════════════════════
+// ─── PROJECTS CRUD ───
 function initColorPicker() {
   const colors = ['#6366f1','#f76a8a','#6af7c8','#f7a66a','#6ab4f7','#c46af7','#f7e46a','#4ade80'];
   const picker = document.getElementById('project-color-picker');
@@ -1041,9 +1086,33 @@ async function createProject() {
   }
 }
 
-// ═══════════════════════════════════════════
-// MEMBERS
-// ═══════════════════════════════════════════
+// Delete project (admin only) — confirmed with project name prompt for safety
+async function deleteCurrentProject() {
+  if (!state.currentProject) return;
+  const projectName = state.currentProject.name;
+
+  // Double-confirm with project name for safety
+  const confirmed = confirm(
+    `Are you sure you want to permanently delete "${projectName}"?\n\nThis will delete ALL tasks in this project and cannot be undone.`
+  );
+  if (!confirmed) return;
+
+  try {
+    await api('DELETE', `/projects/${state.currentProject._id}`);
+    // Remove from local state
+    state.projects = state.projects.filter(p => p._id !== state.currentProject._id);
+    state.currentProject = null;
+    state.tasks = [];
+    // Hide project nav section
+    document.getElementById('project-nav-section').style.display = 'none';
+    renderProjects();
+    loadDashboard();
+    showView('projects');
+    toast(`"${projectName}" deleted`);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ─── MEMBERS ───
 function renderMembers(project) {
   const me = project.members.find(m => (m.user._id||m.user) === state.user._id);
   const isAdmin = me?.role === 'Admin';
@@ -1086,7 +1155,6 @@ async function addMember() {
   try {
     const data = await api('POST', `/projects/${state.currentProject._id}/members`, { email, role });
     state.currentProject = data.project;
-    // Update in projects list
     const idx = state.projects.findIndex(p => p._id === state.currentProject._id);
     if (idx >= 0) state.projects[idx] = data.project;
     renderMembers(state.currentProject);
@@ -1109,25 +1177,17 @@ async function removeMember(userId) {
   } catch(e) { toast(e.message,'error'); }
 }
 
-// ═══════════════════════════════════════════
-// MODAL HELPERS
-// ═══════════════════════════════════════════
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-}
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-}
-// Close on overlay click
+// ─── MODAL HELPERS ───
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => {
     if (e.target === overlay) overlay.classList.remove('open');
   });
 });
 
-// ═══════════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════════
+// ─── UTILS ───
 function fmtDate(d) {
   if (!d) return '';
   return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
@@ -1137,7 +1197,12 @@ function isDue(d) {
   return new Date() > new Date(d);
 }
 function statusStyle(s) {
-  const map = { 'Todo':'background:#ffffff10;color:var(--text-muted)', 'In Progress':'background:#7c6af722;color:var(--accent)', 'Review':'background:#fbbf2422;color:var(--warning)', 'Done':'background:#4ade8022;color:var(--success)' };
+  const map = {
+    'Todo':'background:#ffffff10;color:var(--text-muted)',
+    'In Progress':'background:#7c6af722;color:var(--accent)',
+    'Review':'background:#fbbf2422;color:var(--warning)',
+    'Done':'background:#4ade8022;color:var(--success)'
+  };
   return map[s] || '';
 }
 
@@ -1145,12 +1210,8 @@ function statusStyle(s) {
 document.getElementById('login-password').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
 document.getElementById('login-email').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
 
-// ═══════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════
-if (state.token && state.user) {
-  bootApp();
-}
+// ─── INIT ───
+if (state.token && state.user) { bootApp(); }
 </script>
 </body>
 </html>
